@@ -2,7 +2,7 @@ import os
 import psycopg2
 
 # Connection string from environment or default
-db_uri = os.environ.get('DATABASE_URL', 'postgresql://xmltv:ballzXMLTVballz@192.168.1.198/xmltv')
+db_uri = os.environ.get('DATABASE_URL', 'postgresql://xmltv:mypass@localhost/xmltv')
 
 def migrate():
     print(f"Targeting Database: {db_uri}")
