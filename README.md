@@ -1,4 +1,4 @@
-# EPG App — Docker Setup
+# EPG Aggregator — Docker Setup
 
 Everything runs in a single `docker compose` stack: the Flask app and a
 PostgreSQL database, both on the same host. No reverse proxy, no Redis,
