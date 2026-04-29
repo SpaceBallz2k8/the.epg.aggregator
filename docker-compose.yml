@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: xmltv
       POSTGRES_USER: xmltv
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ballzXMLTVballz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-default}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://xmltv:${POSTGRES_PASSWORD:-ballzXMLTVballz}@db/xmltv
+      DATABASE_URL: postgresql://xmltv:${POSTGRES_PASSWORD:-default}@db/xmltv
       SECRET_KEY: ${SECRET_KEY:-change_me_in_production}
       WHITELIST_IPS: ${WHITELIST_IPS:-127.0.0.1}
     volumes:
