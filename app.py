@@ -20,7 +20,7 @@ from lxml import etree
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_for_session')
-default_db_uri = 'postgresql://xmltv:ballzXMLTVballz@192.168.1.198/xmltv'
+default_db_uri = 'postgresql://xmltv:mypass@localhost/xmltv'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_db_uri)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
