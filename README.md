@@ -78,8 +78,4 @@ docker compose up -d
 
 ---
 
-## Migrating from the old setup
 
-The `docker-entrypoint.sh` script automatically runs `migrate.py` on every
-container start. Migrations are idempotent (uses `IF NOT EXISTS` / `ADD
-COLUMN IF NOT EXISTS`) so running them repeatedly is safe.
