@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: var(--bs-tertiary-bg); padding-top: 3rem; }
+        .link-box { font-family: monospace; word-break: break-all; background: var(--bs-secondary-bg); padding: 1rem; border: 1px dashed var(--bs-border-color); border-radius: 0.5rem; }
+        .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-height: 500px; overflow-y: auto; padding: 10px; border: 1px solid var(--bs-border-color); border-radius: 0.25rem; }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 1000px;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>User Dashboard</h1>
+            <div class="d-flex gap-2">
+                <button id="themeToggle" class="btn btn-outline-secondary btn-sm">🌓 Theme</button>
+                <a href="/" class="btn btn-outline-primary btn-sm">Home</a>
+                <a href="/guide" class="btn btn-outline-info btn-sm">Timeline</a>
+                <a href="/dashboard" class="btn btn-outline-info btn-sm">Dashboard</a>
+                {% if user and user.is_admin %}
+                <a href="/admin" class="btn btn-warning btn-sm">Admin</a>
+                {% endif %}
+                <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+            </div>
+        </div>
+
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                <h4 class="mb-0">Welcome, {{ user.username }}</h4>
+                <span class="badge 
+                    {% if user.tier == 'premium' %}text-bg-warning
+                    {% elif user.tier == 'contributor' %}text-bg-info
+                    {% elif user.tier == 'sponsor' %}text-bg-success
+                    {% else %}text-bg-light{% endif %}">
+                    {{ user.tier|upper }}</span>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted small mb-2">Your unique XMLTV Download Link:</p>
+                <div class="link-box mb-4">
+                    {% if domain_name %}
+                        {{ request.scheme }}://{{ domain_name }}{{ url_for('download_user_xml', username=user.username, api_key=user.api_key) }}
+                    {% else %}
+                        {{ request.url_root.rstrip('/') }}{{ url_for('download_user_xml', username=user.username, api_key=user.api_key) }}
+                    {% endif %}
+                </div>
+
+                {% if collections %}
+                <div class="mb-4">
+                    <h6 class="fw-bold mb-3">Quick Add Collections</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for coll in collections %}
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="action" value="add_collection">
+                            <input type="hidden" name="collection_id" value="{{ coll.id }}">
+                            <button type="submit" class="btn btn-outline-info btn-sm rounded-pill" title="{{ coll.description or '' }}">
+                                ➕ {{ coll.name }} ({{ coll.channels|length }})
+                            </button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                    <hr>
+                </div>
+                {% endif %}
+
+                {% with messages = get_flashed_messages() %}
+                  {% if messages %}
+                    {% for message in messages %}
+                      <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    <input type="hidden" name="country_id" value="{{ country_id or '' }}">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0">Select Channels ({{ selected_ids|length }} / {{ limit }})</h6>
+                        <button type="button" onclick="toggleAllFiltered()" class="btn btn-xs btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;">All/None</button>
+                    </div>
+                    
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3 bg-body-tertiary p-2 border rounded">
+                        <div class="d-flex align-items-center gap-1">
+                            <label class="small fw-bold text-nowrap">Search:</label>
+                            <input type="text" id="dashboardSearchInput" class="form-control form-control-sm" style="width: 130px;" value="{{ search_q or '' }}" placeholder="...">
+                        </div>
+
+                        <div class="d-flex align-items-center gap-1">
+                            <label class="small fw-bold text-nowrap">Per Page:</label>
+                            <select id="perPageSelect" class="form-select form-select-sm" style="width: 70px;">
+                                {% for count in [20, 50, 100, 250] %}
+                                    <option value="{{ count }}" {{ 'selected' if per_page == count }}>{{ count }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-1">
+                            <label class="small fw-bold text-nowrap">Country:</label>
+                            <select id="countryFilter" class="form-select form-select-sm" style="width: 140px;">
+                                <option value="">All</option>
+                                {% for c in countries %}
+                                    <option value="{{ c.id }}" {{ 'selected' if country_id == c.id }}>{{ c.flag }} {{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-1">
+                            <label class="small fw-bold text-nowrap">Categories:</label>
+                            <select id="categoryFilter" class="form-select form-select-sm" style="width: 130px;">
+                                <option value="">All</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {{ 'selected' if category_id == cat.id }}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="channel-grid">
+                        {% for channel in channels %}
+                        <label class="list-group-item d-flex align-items-start border p-2 rounded">
+                            <input class="form-check-input me-2 mt-1" type="checkbox" name="channels" value="{{ channel.id }}" {{ 'checked' if channel.id in selected_ids }}>
+                            <div class="flex-grow-1">
+                                <div class="small fw-bold">{{ channel.group.canonical_name if channel.group else (channel.name_override if channel.name_override else channel.name) }}</div>
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    {% for cat in channel.categories %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" style="font-size: 0.55rem;">{{ cat.name }}</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.7rem;">{{ channel.group.tvg_id if channel.group else channel.id }}</div>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <nav class="mt-3">
+                        <ul class="pagination pagination-sm justify-content-center">
+                            {% if pagination.has_prev %}
+                            <li class="page-item"><a class="page-link text-secondary" href="{{ url_for('dashboard', page=pagination.prev_num, country_id=country_id, per_page=per_page, q=search_q) }}">&laquo; Prev</a></li>
+                            {% endif %}
+                            <li class="page-item disabled"><span class="page-link px-3">Page {{ pagination.page }} of {{ pagination.pages }}</span></li>
+                            {% if pagination.has_next %}
+                            <li class="page-item"><a class="page-link text-secondary" href="{{ url_for('dashboard', page=pagination.next_num, country_id=country_id, per_page=per_page, q=search_q) }}">Next &raquo;</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+
+                    <button type="submit" class="btn btn-primary w-100 mt-2 py-2 fw-bold">Save Channel Selection</button>
+                </form>
+            </div>
+            <div class="card-footer bg-body-tertiary p-4 border-top">
+                <h5 class="mb-3">Security</h5>
+                <form action="/dashboard/password" method="POST" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">New Password</label>
+                        <input type="password" name="new_password" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">Update Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function() {
+        // --- Theme Application ---
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const storedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        html.setAttribute('data-bs-theme', storedTheme);
+        if (themeBtn) {
+            themeBtn.addEventListener('click', () => {
+                const newTheme = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+        }
+
+        // --- Country Filter Logic ---
+        const countryFilter = document.getElementById('countryFilter');
+        if (countryFilter) {
+            countryFilter.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('country_id', this.value); } 
+                else { url.searchParams.delete('country_id'); }
+                url.searchParams.delete('page'); // Reset to page 1 on filter change
+                window.location.href = url.toString();
+            });
+        }
+
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('cat_id', this.value); } 
+                else { url.searchParams.delete('cat_id'); }
+                url.searchParams.delete('page');
+                window.location.href = url.toString();
+            });
+        }
+
+        const dashboardSearchInput = document.getElementById('dashboardSearchInput');
+        if (dashboardSearchInput) {
+            dashboardSearchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent accidental form submission
+                    const url = new URL(window.location.href);
+                    if (this.value) { url.searchParams.set('q', this.value); } 
+                    else { url.searchParams.delete('q'); }
+                    url.searchParams.delete('page');
+                    window.location.href = url.toString();
+                }
+            });
+        }
+
+        const perPageSelect = document.getElementById('perPageSelect');
+        if (perPageSelect) {
+            perPageSelect.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('per_page', this.value); } 
+                else { url.searchParams.delete('per_page'); }
+                url.searchParams.delete('page');
+                window.location.href = url.toString();
+            });
+        }
+
+        window.toggleAllFiltered = function() {
+            const checkboxes = document.querySelectorAll('.channel-grid input[type="checkbox"]');
+            const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+            checkboxes.forEach(cb => cb.checked = anyUnchecked);
+        };
+    })();
+    </script>
+</body>
+</html>

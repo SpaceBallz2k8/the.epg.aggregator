@@ -1,0 +1,36 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xmltv
+      POSTGRES_USER: xmltv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ballzXMLTVballz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xmltv -d xmltv"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://xmltv:${POSTGRES_PASSWORD:-ballzXMLTVballz}@db/xmltv
+      SECRET_KEY: ${SECRET_KEY:-change_me_in_production}
+      WHITELIST_IPS: ${WHITELIST_IPS:-127.0.0.1}
+    volumes:
+      # Optional: persist any local files your app writes (remove if not needed)
+      - app_data:/app/data
+
+volumes:
+  postgres_data:
+  app_data:

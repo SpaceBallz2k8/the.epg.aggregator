@@ -1,0 +1,28 @@
+/* Basic UI styling to stop 404 errors and provide clear feedback */
+body { background-color: var(--bs-tertiary-bg); color: var(--bs-body-color); line-height: 1.6; }
+.container { max-width: 1000px; margin: auto; padding: 20px; }
+section { background: var(--bs-body-bg); padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--bs-secondary-bg); padding: 12px; border-bottom: 2px solid var(--bs-border-color); }
+td { padding: 12px; border-bottom: 1px solid var(--bs-border-color); }
+
+/* Button variants */
+.btn-action { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+.btn-action:hover { opacity: 0.8; }
+
+/* Sync Progress Styling */
+.progress-wrap { margin-top: 10px; width: 100%; }
+.progress-bar-container { background: var(--bs-secondary-bg); border-radius: 10px; height: 10px; overflow: hidden; }
+.progress-bar { height: 100%; width: 0; background: #007bff; transition: width 0.4s ease; }
+
+/* Flash Messages */
+.flash { padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+.flash-success { background: #d4edda; color: #155724; }
+.flash-error { background: #f8d7da; color: #721c24; }
+
+/* Modal styles */
+.modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+.modal-content { background: var(--bs-body-bg); color: var(--bs-body-color); margin: 10% auto; padding: 20px; border-radius: 8px; width: 50%; }
+
+code { background: var(--bs-secondary-bg); padding: 2px 4px; border-radius: 4px; font-weight: bold; color: #d63384; }
+small { color: var(--bs-secondary-color); }

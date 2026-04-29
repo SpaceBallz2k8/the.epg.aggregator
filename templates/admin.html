@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding-top: 2rem; padding-bottom: 2rem; }
+        .badge-premium { background-color: #ffc107; color: #000; }
+        .badge-contributor { background-color: #17a2b8; color: #fff; }
+        .badge-sponsor { background-color: #6f42c1; color: #fff; }
+        .badge-free { background-color: #6c757d; color: #fff; }
+        .nav-tabs .nav-link { color: var(--bs-body-color); }
+        .nav-tabs .nav-link.active { font-weight: bold; }
+        .cursor-pointer { cursor: pointer; }
+        .btn-xs { padding: 0.25rem 0.4rem; font-size: 0.75rem; }
+        th.sortable { cursor: pointer; position: relative; }
+        th.sortable:hover { background-color: var(--bs-secondary-bg); }
+        .nav-tabs .nav-link { font-size: 0.82rem; padding: 0.5rem 0.65rem; }
+        /* Nested Dropdown Styles */
+        .dropdown-submenu { position: relative; }
+        .dropdown-submenu > .dropdown-menu { top: 0; left: 100%; margin-top: -6px; margin-left: -1px; display: none; }
+        .dropdown-submenu:hover > .dropdown-menu { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Admin Dashboard</h1>
+            <div class="d-flex gap-2">
+                <button id="themeToggle" class="btn btn-outline-secondary btn-sm">?? Theme</button>
+                <a href="/" class="btn btn-outline-primary btn-sm">Home</a>
+                <a href="/guide" class="btn btn-outline-info btn-sm">Timeline</a>
+                <a href="/dashboard" class="btn btn-outline-info btn-sm">Dashboard</a>
+                {% if user and user.is_admin %}
+                <a href="/admin" class="btn btn-warning btn-sm">Admin</a>
+                {% endif %}
+                <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="sources-tab" data-bs-toggle="tab" data-bs-target="#sources" type="button">Sources</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="grouping-tab" data-bs-toggle="tab" data-bs-target="#grouping" type="button">Grouping</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="editor-tab" data-bs-toggle="tab" data-bs-target="#editor" type="button">Editor</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="hidden-tab" data-bs-toggle="tab" data-bs-target="#hidden" type="button">Hidden</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button">Stats</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">Users</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button">Security</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button">Backup</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="collections-tab" data-bs-toggle="tab" data-bs-target="#collections" type="button">Collections</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="adminTabsContent">
+            <!-- Tab: Sources -->
+            <div class="tab-pane fade show active" id="sources" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Add New Source</h5>
+                        <form action="/admin/source/add" method="POST" class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" name="name" class="form-control" placeholder="Name (e.g. UKFTA)" required>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="text" name="url" class="form-control" placeholder="XMLTV URL (http://...)" required>
+                            </div>
+                            <div class="col-md-3">
+                                <select name="country_id" class="form-select">
+                                    {% for c in all_countries %}
+                                        <option value="{{ c.id }}" {{ 'selected' if c.code == 'world' }}>{{ c.flag }} {{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-success w-100">Add</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mb-3">
+                    <a href="/admin/sync" class="btn btn-primary btn-sm">Force Sync All</a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="sourcesTable">
+                        <thead class="table-light">
+                            <tr><th class="sortable" onclick="sortSources(0)">Source ?</th><th class="sortable" onclick="sortSources(1)">URL / Settings / Country ?</th><th>Status</th><th>Stats</th><th>Last Sync</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for source in sources %}
+                            <tr id="source-row-{{ source.id }}" data-country="{{ source.country.name if source.country else 'World' }}" data-name="{{ source.name or '' }}">
+                                <td>
+                                    <span class="badge bg-secondary mb-1">#{{ source.id }}</span>
+                                    <input type="text" name="name" form="edit-source-{{ source.id }}" class="form-control form-control-sm fw-bold" value="{{ source.name or '' }}" placeholder="Name">
+                                </td>
+                                <td>
+                                    <form action="/admin/source/{{ source.id }}/edit" method="POST" id="edit-source-{{ source.id }}">
+                                        <input type="text" name="url" class="form-control form-control-sm mb-1" value="{{ source.url }}" required>
+                                        <div class="d-flex gap-2">
+                                            <div class="input-group input-group-sm" style="width: 140px;">
+                                                <span class="input-group-text">Hrs</span>
+                                                <input type="number" name="refresh_interval" value="{{ source.refresh_interval }}" class="form-control" min="1">
+                                            </div>
+                                            <select name="country_id" class="form-select form-select-sm" style="width: 150px;">
+                                                {% for c in all_countries %}
+                                                    <option value="{{ c.id }}" {{ 'selected' if source.country_id == c.id }}>{{ c.flag }} {{ c.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button class="btn btn-outline-primary btn-sm">Save</button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td id="status-{{ source.id }}">
+    				{% if source.is_syncing %}
+     				   <span class="text-primary fw-bold small">&#x23f3; Syncing...</span>
+  				  {% elif source.last_error %}
+    				    <span class="text-danger small" title="{{ source.last_error }}">&#x274c; Error</span>
+  				  {% else %}
+  				      <span class="text-success small">&#x2705; Idle</span>
+  				  {% endif %}
+				</td>
+                                <td id="stats-{{ source.id }}">
+                                    <small class="d-block">{{ source.channel_count }} Ch / {{ source.prog_count }} Prg</small>
+                                    <div id="progress-bar-wrap-{{ source.id }}" style="display:none;" class="mt-1">
+                                        <div class="progress" style="height: 6px;">
+                                            <div id="progress-bar-{{ source.id }}" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                        <small id="progress-label-{{ source.id }}" class="text-muted" style="font-size: 0.65rem;"></small>
+                                    </div>
+                                </td>
+                                <td class="small text-muted">
+                                    {{ source.last_updated.strftime('%Y-%m-%d %H:%M') if source.last_updated else 'Never' }}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <form action="/admin/source/{{ source.id }}/refresh" method="POST">
+                                            <button class="btn btn-outline-success btn-sm" id="refresh-btn-{{ source.id }}" {% if source.is_syncing %}disabled{% endif %}>Sync</button>
+                                        </form>
+                                        <form action="/admin/source/{{ source.id }}/delete" method="POST" onsubmit="return confirm('Remove source?');">
+                                            <button class="btn btn-outline-danger btn-sm">Del</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Grouping -->
+            <div class="tab-pane fade" id="grouping" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <small class="text-muted">Hold <strong>CTRL</strong> to select multiple.</small>
+                    <div class="d-flex align-items-center gap-2 me-auto ms-3">
+                        <label class="small fw-bold">Per Page:</label>
+                        <select id="perPageSelect" class="form-select form-select-sm" style="width: 80px;">
+                            {% for count in [20, 50, 100, 250] %}
+                                <option value="{{ count }}" {{ 'selected' if per_page == count }}>{{ count }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small fw-bold">Search:</label>
+                        <input type="text" id="groupSearchInput" class="form-control form-control-sm" style="width: 180px;" value="{{ search_q or '' }}" placeholder="Name or ID...">
+                        <span class="mx-1 text-muted">|</span>
+                        
+                        <label class="small fw-bold">Filter Country:</label>
+                        <select id="countryFilter" class="form-select form-select-sm" style="width: 200px;">
+                            <option value="">All Countries</option>
+                            {% for c in countries %}
+                                <option value="{{ c.id }}" {{ 'selected' if country_id == c.id }}>{{ c.flag }} {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <form id="bulkChannelForm" method="POST" action="/admin/group_channels">
+                    <select id="multiChannelSelect" name="channel_ids" multiple class="form-select mb-3" size="30" style="font-family: monospace; font-size: 0.85rem;"
+                            data-queued-ids='{{ group_jobs | map(attribute="channel_ids") | sum(start=[]) | tojson }}'>
+                        {% for channel in channels %}
+                        <option value="{{ channel.id }}" 
+                                data-name="{{ channel.group.canonical_name if channel.group else channel.name }}"
+                                data-tvg-id="{{ channel.group.tvg_id if channel.group else '' }}"
+                                data-is-group="{{ 'true' if channel.group else 'false' }}"
+                                data-primary-id="{{ channel.group.primary_channel_id if channel.group else '' }}"
+                                data-logo-override="{{ channel.group.logo_override if channel.group else '' }}"
+                                data-members='{{ channel.group.members_list|tojson if channel.group else "[]" }}'
+                                data-member-ids="{{ channel.group.channels|map(attribute='id')|join(',') if channel.group else channel.id }}"
+                                data-sources="{{ channel.all_source_names|join(', ') }}"
+                                data-group-db-id="{{ channel.group.id if channel.group else '' }}">
+                            {{ (channel.group.canonical_name if channel.group else channel.name).ljust(30) }} 
+                            {% if channel.group %} (grouped) {% else %} ({{ channel.id }}) {% endif %} | Sources: {{ channel.all_source_names|join(', ') }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div id="hiddenModalInputs"></div>
+                </form>
+
+                <nav class="mb-4">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        {% if pagination.has_prev %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('admin', page=pagination.prev_num, country_id=country_id, per_page=per_page, q=search_q) }}#grouping">&laquo; Prev</a></li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">Page {{ pagination.page }} of {{ pagination.pages }}</span></li>
+                        {% if pagination.has_next %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('admin', page=pagination.next_num, country_id=country_id, per_page=per_page, q=search_q) }}#grouping">Next &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+                <div class="d-flex gap-2">
+                    <button type="button" onclick="openGroupModal()" class="btn btn-primary">Group Selected</button>
+                    <button type="button" onclick="queueSelectedChannels()" class="btn btn-outline-primary">Queue for Grouping</button>
+                    <button type="button" onclick="hideSelectedChannels()" class="btn btn-secondary">Hide Selected</button>
+                </div>
+
+                {% if group_jobs %}
+                <div class="card shadow-sm mt-4 border-primary">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-primary mb-3">Pending Group Jobs</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead><tr><th>Queued Channels</th><th>Action</th></tr></thead>
+                                <tbody>
+                                    {% for job in group_jobs %}
+                                    <tr>
+                                        <td>
+                                            {% for cid in job.channel_ids %}
+                                                <span class="badge bg-light text-dark border me-1">{{ cid }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-primary btn-xs" onclick="processQueuedJob({{ job.id }})">Process</button>
+                                                <form action="/admin/group_queue/delete/{{ job.id }}" method="POST">
+                                                    <button class="btn btn-outline-danger btn-xs">Discard</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab: Categories & Collections -->
+            <div class="tab-pane fade" id="collections" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4 border-info">
+                            <div class="card-body">
+                                <h5 class="card-title">Create Collection</h5>
+                                <form action="/admin/collection/add" method="POST" class="row g-2">
+                                    <div class="col-12"><input type="text" name="name" class="form-control form-control-sm" placeholder="Name (e.g. Sports Pack)" required></div>
+                                    <div class="col-12"><input type="text" name="description" class="form-control form-control-sm" placeholder="Description"></div>
+                                    <div class="col-12"><button type="submit" class="btn btn-info btn-sm w-100 text-white">Create Collection</button></div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <table class="table table-sm table-hover border">
+                            <thead class="table-light"><tr><th>Collection Name</th><th class="text-center">Ch</th><th class="text-end">Actions</th></tr></thead>
+                            <tbody>
+                                {% for coll in collections %}
+                                <tr>
+                                    <td><button class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" onclick="manageItem('collection', {{ coll.id }}, '{{ coll.name }}')">{{ coll.name }}</button></td>
+                                    <td class="text-center"><span class="badge bg-primary rounded-pill">{{ coll.channels|length }}</span></td>
+                                    <td class="text-end">
+                                        <form action="/admin/collection/{{ coll.id }}/delete" method="POST" class="d-inline">
+                                            <button class="btn btn-outline-danger btn-xs">Del</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4 border-success">
+                            <div class="card-body">
+                                <h5 class="card-title">Create Category</h5>
+                                <form action="/admin/category/add" method="POST" class="row g-2">
+                                    <div class="col-12"><input type="text" name="name" class="form-control form-control-sm" placeholder="Category Name (e.g. Movies)" required></div>
+                                    <div class="col-12"><button type="submit" class="btn btn-success btn-sm w-100">Create Category</button></div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <table class="table table-sm table-hover border">
+                            <thead class="table-light"><tr><th>Category Name</th><th class="text-center">Ch</th><th class="text-end">Actions</th></tr></thead>
+                            <tbody>
+                                {% for cat in categories %}
+                                <tr>
+                                    <td><button class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" onclick="manageItem('category', {{ cat.id }}, '{{ cat.name }}')">{{ cat.name }}</button></td>
+                                    <td class="text-center"><span class="badge bg-secondary rounded-pill">{{ cat.channels|length }}</span></td>
+                                    <td class="text-end">
+                                        <form action="/admin/category/{{ cat.id }}/delete" method="POST" class="d-inline">
+                                            <button class="btn btn-outline-danger btn-xs">Del</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="itemManagerSection" style="display:none;" class="card mt-4 border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0" id="managerTitle">Manage Members</h6>
+                        <button type="button" class="btn-close btn-close-white" onclick="document.getElementById('itemManagerSection').style.display='none'"></button>
+                    </div>
+                    <div class="card-body">
+                        <div id="managerList" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Channel Editor -->
+            <div class="tab-pane fade" id="editor" role="tabpanel">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                    <div class="dropdown" id="bulkEditorActions" style="display:none !important;">
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">Bulk Actions</button>
+                        <ul class="dropdown-menu">
+                            <li class="dropdown-submenu">
+                                <a class="dropdown-item dropdown-toggle" href="#">Add to Collection</a>
+                                <ul class="dropdown-menu">
+                                    {% for coll in collections %}
+                                    <li><button class="dropdown-item py-1" onclick="bulkAction('collection', {{ coll.id }}, 'add')">{{ coll.name }}</button></li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            <li class="dropdown-submenu">
+                                <a class="dropdown-item dropdown-toggle" href="#">Add to Category</a>
+                                <ul class="dropdown-menu">
+                                    {% for cat in categories %}
+                                    <li><button class="dropdown-item py-1" onclick="bulkAction('category', {{ cat.id }}, 'add')">{{ cat.name }}</button></li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item text-danger py-1" onclick="hideSelectedChannels('editor')">Hide Selected</button></li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 me-auto">
+                        <label class="small fw-bold">Per Page:</label>
+                        <select id="editorPerPageSelect" class="form-select form-select-sm" style="width: 80px;">
+                            {% for count in [20, 50, 100, 250] %}
+                                <option value="{{ count }}" {{ 'selected' if per_page == count }}>{{ count }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small fw-bold">Search:</label>
+                        <input type="text" id="editorSearchInput" class="form-control form-control-sm" style="width: 180px;" value="{{ search_q or '' }}" placeholder="Name or ID...">
+                        <span class="mx-1 text-muted">|</span>
+                        
+                        <label class="small fw-bold">Filter Country:</label>
+                        <select id="editorCountryFilter" class="form-select form-select-sm" style="width: 200px;">
+                            <option value="">All Countries</option>
+                            {% for c in countries %}
+                                <option value="{{ c.id }}" {{ 'selected' if country_id == c.id }}>{{ c.flag }} {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle" id="editorTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="editorSelectAll"></th>
+                                <th>Logo</th>
+                                <th>Name</th>
+                                <th>tvg-id</th>
+                                <th class="text-end pe-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for channel in channels %}
+                            {% set icon = channel.preferred_logo %}
+                            {% set tvg_id = channel.group.tvg_id if channel.group else (channel.tvg_id_override if channel.tvg_id_override else channel.id) %}
+                            <tr>
+                                <td><input type="checkbox" class="form-check-input editor-checkbox" value="{{ channel.id }}"></td>
+                                <td>
+                                    {% if icon %}
+                                    <img src="{{ icon }}" style="width: 30px; height: 30px; object-fit: contain;" alt="">
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ channel.group.canonical_name if channel.group else channel.name }}</strong>
+                                    {% if channel.group %}<span class="badge bg-info ms-1" style="font-size: 0.6rem;">Grouped</span>{% endif %}
+                                </td>
+                                <td><code>{{ tvg_id }}</code></td>
+                                <td class="text-end pe-3">
+                                    <div class="btn-group">
+                                    <button class="btn btn-outline-primary btn-xs" 
+                                            onclick="openEditMetadataModal('{{ channel.id }}', '{{ channel.group.canonical_name if channel.group else channel.name }}', '{{ tvg_id }}', '{{ channel.logo_override or '' }}')">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-outline-info btn-xs dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <li><h6 class="dropdown-header small py-1">Quick Tag Category</h6></li>
+                                        {% for cat in categories %}
+                                            {% set has_cat = cat in channel.categories %}
+                                            <li><button class="dropdown-item small py-1 {{ 'text-primary fw-bold' if has_cat }}" onclick="bulkAction('category', {{ cat.id }}, '{{ 'remove' if has_cat else 'add' }}', '{{ channel.id }}')">{{ '? ' if has_cat }}{{ cat.name }}</button></li>
+                                        {% endfor %}
+                                    </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="mt-4">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        {% if pagination.has_prev %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('admin', page=pagination.prev_num, country_id=country_id, per_page=per_page, q=search_q) }}#editor">&laquo; Prev</a></li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">Page {{ pagination.page }} of {{ pagination.pages }}</span></li>
+                        {% if pagination.has_next %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('admin', page=pagination.next_num, country_id=country_id, per_page=per_page, q=search_q) }}#editor">Next &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Tab: Hidden Channels -->
+            <div class="tab-pane fade" id="hidden" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr><th>Name</th><th>XML ID</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for hc in hidden_channels %}
+                            <tr>
+                                <td>{{ hc.name }}</td>
+                                <td><code>{{ hc.id }}</code></td>
+                                <td>
+                                    <form action="/admin/channel/{{ hc.id }}/unhide" method="POST">
+                                        <button class="btn btn-outline-success btn-xs">Restore</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center p-4">No hidden channels.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Stats -->
+            <div class="tab-pane fade" id="stats" role="tabpanel">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center border-primary shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Total Channels</h6>
+                                <h3 class="fw-bold mb-0">{{ stats.total_channels }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center border-success shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Total Programmes</h6>
+                                <h3 class="fw-bold mb-0">{{ stats.total_programmes }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center border-info shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Channel Groups</h6>
+                                <h3 class="fw-bold mb-0">{{ stats.total_groups }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center border-secondary shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1">Hidden Channels</h6>
+                                <h3 class="fw-bold mb-0">{{ stats.total_hidden }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5>Channels per Country</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-light">
+                            <tr><th>Country</th><th class="text-center">Count</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for country, count in stats.country_counts %}
+                            <tr>
+                                <td>{{ country.flag }} {{ country.name }}</td>
+                                <td class="text-center fw-bold">{{ count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Users & Settings -->
+            <div class="tab-pane fade" id="users" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5>Users</h5>
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr><th>User</th><th>Tier</th><th>Expiry</th><th>Action</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for u in users %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ u.username }}</strong> 
+                                        {% if u.is_admin %}<span class="badge bg-danger">ADMIN</span>{% endif %}
+                                        {% if not u.is_active %}<span class="badge bg-secondary">DISABLED</span>{% endif %}
+                                    </td>
+                                    <td><span class="badge badge-{{ u.tier }}">{{ u.tier|upper }}</span></td>
+                                    <td class="small text-muted">
+                                        {% if u.premium_expiry %}
+                                            {{ u.premium_expiry.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">Manage</button>
+                                            <ul class="dropdown-menu">
+                                                <li><button name="action" value="toggle_status" form="ua{{u.id}}" class="dropdown-item">{{ 'Enable' if not u.is_active else 'Disable' }} User</button></li>
+                                                <li><button name="action" value="toggle_admin" form="ua{{u.id}}" class="dropdown-item">Toggle Admin</button></li>
+                                                <li><button type="button" class="dropdown-item" onclick="resetUserPassword({{ u.id }}, '{{ u.username }}')">Reset Password</button></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><button name="action" value="upgrade_1m" form="ua{{u.id}}" class="dropdown-item">+1 Month Premium</button></li>
+                                                <li><button name="action" value="upgrade_1y" form="ua{{u.id}}" class="dropdown-item">+12 Month Premium</button></li>
+                                                <li><button name="action" value="downgrade" form="ua{{u.id}}" class="dropdown-item">Set Free</button></li>
+                                                <li><button name="action" value="set_contributor" form="ua{{u.id}}" class="dropdown-item">Set Contributor</button></li>
+                                                <li><button name="action" value="set_sponsor" form="ua{{u.id}}" class="dropdown-item">Set Sponsor</button></li>
+                                                {% if u.username != 'admin' %}
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><button name="action" value="delete" form="ua{{u.id}}" class="dropdown-item text-danger" onclick="return confirm('Delete this user permanently?')">Delete User</button></li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                        <form id="ua{{u.id}}" action="/admin/user/{{ u.id }}/action" method="POST" style="display:none;">
+                                            <input type="hidden" name="new_password" id="pw{{ u.id }}">
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <h5>System Settings</h5>
+                        <form action="/admin/settings" method="POST" class="card card-body shadow-sm">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" name="registration_enabled" value="true" {{ 'checked' if reg_enabled == 'true' }}>
+                                <label class="form-check-label">Public Registration</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Free Tier Limit</label>
+                                <input type="number" name="free_tier_limit" class="form-control form-control-sm" value="{{ free_limit }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Premium Tier Limit</label>
+                                <input type="number" name="premium_tier_limit" class="form-control form-control-sm" value="{{ premium_limit }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Contributor Tier Limit</label>
+                                <input type="number" name="contributor_tier_limit" class="form-control form-control-sm" value="{{ contributor_limit }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Sponsor Tier Limit</label>
+                                <input type="number" name="sponsor_tier_limit" class="form-control form-control-sm" value="{{ sponsor_limit }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Days to keep old program data</label>
+                                <input type="number" name="epg_retention_days" class="form-control form-control-sm" value="{{ retention_days }}" min="1">
+                                <div class="form-text" style="font-size: 0.65rem;">Programmes ending before this threshold are auto-purged.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">Domain Name (Optional)</label>
+                                <input type="text" name="domain_name" class="form-control form-control-sm" value="{{ domain_name }}" placeholder="e.g. epg.mydomain.com">
+                                <div class="form-text" style="font-size: 0.65rem;">If set, used for user XML links. Do not include http://</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold">GitHub Classic Token (Optional)</label>
+                                <input type="password" name="github_token" class="form-control form-control-sm" value="{{ github_token }}">
+                                <div class="form-text" style="font-size: 0.65rem;">Used to increase GitHub API rate limits (60/hr to 5000/hr).</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100">Save</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Security -->
+            <div class="tab-pane fade" id="security" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">IP Ban Management</h5>
+                        <p class="text-muted small">IPs shown here are blocked from accessing any part of the application.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr><th>IP Address</th><th>Reason</th><th>Banned At</th><th>Action</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for ban in banned_ips %}
+                                    <tr>
+                                        <td><code>{{ ban.ip }}</code></td>
+                                        <td><span class="small text-danger">{{ ban.reason }}</span></td>
+                                        <td>{{ ban.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <form action="/admin/security/unban/{{ ban.id }}" method="POST">
+                                                <button class="btn btn-outline-success btn-xs">Unban</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="4" class="text-center p-4">No active bans.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Backup & Restore -->
+            <div class="tab-pane fade" id="backup" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-body">
+                                <h5 class="card-title">Configuration Backup</h5>
+                                <p class="text-muted small">Download a JSON file containing all users, settings, sources, channel groups, and channel metadata. (EPG programme data is excluded).</p>
+                                <a href="/admin/backup/export" class="btn btn-primary btn-sm">Download Backup (.json)</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4 border-danger">
+                            <div class="card-body">
+                                <h5 class="card-title text-danger">Restore Configuration</h5>
+                                <p class="text-muted small">Upload a previously exported backup file. <strong>Warning: This will overwrite your current configuration!</strong></p>
+                                <form action="/admin/backup/import" method="POST" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <input type="file" name="backup_file" class="form-control form-control-sm" accept=".json" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Are you sure? This will wipe your current settings!')">Restore from File</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grouping Modal with EPG Preview -->
+    <div class="modal fade" id="groupModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content text-body">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/admin/group_channels" method="POST">
+                    <!-- Filter persistence -->
+                    <input type="hidden" name="q" value="{{ search_q or '' }}">
+                    <input type="hidden" name="country_id" value="{{ country_id or '' }}">
+                    <input type="hidden" name="page" value="{{ pagination.page }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <div class="modal-body">
+                        <div id="modalHiddenInputs"></div>
+                        <input type="hidden" name="job_id" id="modalJobId">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Display Name</label>
+                            <input type="text" name="canonical_name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">tvg-id</label>
+                            <input type="text" name="tvg_id" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Logo URL Override</label>
+                            <div class="input-group">
+                                <input type="text" name="logo_url" id="groupMetaLogo" class="form-control">
+                                <button class="btn btn-outline-secondary" type="button" onclick="openLogoSelector('groupMetaLogo')">Select Image</button>
+                            </div>
+                            <div class="form-text small" style="font-size: 0.7rem;">Leave blank to use original provider icon.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-primary">Data Comparison (EPG Preview)</label>
+                            <div id="epgPreviewContainer" class="border rounded p-2 bg-body-tertiary" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem;"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">EPG Provider</label>
+                            <select name="primary_channel_id" id="primaryChannelDropdown" class="form-select" required></select>
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-between">
+                        <div>
+                            <button type="button" id="ungroupBtn" class="btn btn-danger d-none" onclick="confirmUngroup()">Ungroup</button>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Group</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Ungroup Form -->
+    <form id="ungroupForm" method="POST" style="display:none;">
+        <input type="hidden" name="q" value="{{ search_q or '' }}">
+        <input type="hidden" name="country_id" value="{{ country_id or '' }}">
+        <input type="hidden" name="page" value="{{ pagination.page }}">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+    </form>
+
+    <!-- Metadata Editor Modal -->
+    <div class="modal fade" id="editMetadataModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content text-body">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Channel Metadata</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/admin/channel/update_metadata" method="POST">
+                    <!-- Carry over current filters for the redirect -->
+                    <input type="hidden" name="q" value="{{ search_q or '' }}">
+                    <input type="hidden" name="country_id" value="{{ country_id or '' }}">
+                    <input type="hidden" name="page" value="{{ pagination.page }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    
+                    <div class="modal-body">
+                        <input type="hidden" name="channel_id" id="editMetaId">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Channel Name</label>
+                            <input type="text" name="name" id="editMetaName" class="form-control">
+                            <div class="form-text small" style="font-size: 0.7rem;">Custom name for UI and XML. Leave blank to use original.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">tvg-id</label>
+                            <input type="text" name="tvg_id" id="editMetaTvgId" class="form-control">
+                            <div class="form-text small" style="font-size: 0.7rem;">Custom ID for XML export. Leave blank to use default.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Logo URL Override</label>
+                            <div class="input-group">
+                                <input type="text" name="logo_url" id="editMetaLogo" class="form-control">
+                                <button class="btn btn-outline-secondary" type="button" onclick="openLogoSelector()">Select Image</button>
+                            </div>
+                            <div class="form-text small" style="font-size: 0.7rem;">Leave blank to use original provider icon.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logo Selector Modal -->
+    <div class="modal fade" id="logoSelectorModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content text-body">
+                <div class="modal-header">
+                    <h5 class="modal-title">GitHub Logo Browser</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb" id="logoBreadcrumb"></ol>
+                    </nav>
+                    <div id="logoLoading" class="text-center p-5" style="display:none;">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Fetching data...</p>
+                    </div>
+                    <div id="logoGrid" class="row row-cols-2 row-cols-md-4 row-cols-lg-6 g-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function sortSources(colIdx) {
+        const table = document.getElementById("sourcesTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
+        const isAsc = table.dataset.sortCol === colIdx.toString() && table.dataset.sortDir === 'asc';
+        
+        rows.sort((a, b) => {
+            let valA, valB;
+            if (colIdx === 0) {
+                valA = (a.dataset.name.toLowerCase() || 'zzz') + a.cells[0].querySelector('.badge').innerText;
+                valB = (b.dataset.name.toLowerCase() || 'zzz') + b.cells[0].querySelector('.badge').innerText;
+            } else {
+                // Sort by country data attribute if it exists, otherwise URL
+                valA = a.dataset.country.toLowerCase() + a.cells[1].querySelector('input[name="url"]').value.toLowerCase();
+                valB = b.dataset.country.toLowerCase() + b.cells[1].querySelector('input[name="url"]').value.toLowerCase();
+            }
+            return isAsc ? (valA > valB ? -1 : 1) : (valA > valB ? 1 : -1);
+        });
+        
+        table.dataset.sortCol = colIdx;
+        table.dataset.sortDir = isAsc ? 'desc' : 'asc';
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
+    (function() {
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const storedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        html.setAttribute('data-bs-theme', storedTheme);
+        themeBtn.addEventListener('click', () => {
+            const newTheme = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        document.querySelectorAll('#adminTabs button').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                bootstrap.Tab.getOrCreateInstance(el).show();
+                window.location.hash = el.getAttribute('data-bs-target');
+            });
+        });
+        const hash = window.location.hash;
+        if (hash) {
+            const triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]');
+            if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        }
+
+        const countryFilter = document.getElementById('countryFilter');
+        if (countryFilter) {
+            countryFilter.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('country_id', this.value); } 
+                else { url.searchParams.delete('country_id'); }
+                url.searchParams.delete('page');
+                url.hash = 'grouping';
+                window.location.href = url.toString();
+            });
+        }
+
+        const perPageSelect = document.getElementById('perPageSelect');
+        if (perPageSelect) {
+            perPageSelect.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('per_page', this.value); } 
+                else { url.searchParams.delete('per_page'); }
+                url.searchParams.delete('page');
+                url.hash = 'grouping';
+                window.location.href = url.toString();
+            });
+        }
+
+        const editorCountryFilter = document.getElementById('editorCountryFilter');
+        if (editorCountryFilter) {
+            editorCountryFilter.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('country_id', this.value); } 
+                else { url.searchParams.delete('country_id'); }
+                url.searchParams.delete('page');
+                url.hash = 'editor';
+                window.location.href = url.toString();
+            });
+        }
+
+        const editorPerPageSelect = document.getElementById('editorPerPageSelect');
+        if (editorPerPageSelect) {
+            editorPerPageSelect.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                if (this.value) { url.searchParams.set('per_page', this.value); } 
+                else { url.searchParams.delete('per_page'); }
+                url.searchParams.delete('page');
+                url.hash = 'editor';
+                window.location.href = url.toString();
+            });
+        }
+
+        const editorSearchInput = document.getElementById('editorSearchInput');
+        if (editorSearchInput) {
+            editorSearchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const url = new URL(window.location.href);
+                    if (this.value) { url.searchParams.set('q', this.value); } 
+                    else { url.searchParams.delete('q'); }
+                    url.searchParams.delete('page');
+                    url.hash = 'editor';
+                    window.location.href = url.toString();
+                }
+            });
+        }
+
+        const groupSearchInput = document.getElementById('groupSearchInput');
+        if (groupSearchInput) {
+            groupSearchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const url = new URL(window.location.href);
+                    if (this.value) { url.searchParams.set('q', this.value); } 
+                    else { url.searchParams.delete('q'); }
+                    url.searchParams.delete('page');
+                    url.hash = 'grouping';
+                    window.location.href = url.toString();
+                }
+            });
+        }
+
+        const sourceIds = [{% for source in sources %}{{ source.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const polling = {};
+        function updateRow(id, data) {
+            const statusEl = document.getElementById('status-' + id);
+            const barWrap  = document.getElementById('progress-bar-wrap-' + id);
+            const bar      = document.getElementById('progress-bar-' + id);
+            const label    = document.getElementById('progress-label-' + id);
+            const btn      = document.getElementById('refresh-btn-' + id);
+            if (!statusEl) return;
+            if (data.is_syncing) {
+                statusEl.innerHTML = '<span class=\"text-primary fw-bold small\">\u23f3 ' + (data.phase || 'Syncing') + '</span>';
+                barWrap.style.display = 'block';
+                bar.style.width = Math.min(95, 25 + (data.live_progs / 1000 || 0)) + '%';
+                label.textContent = (data.phase || '') + ' (' + (data.live_channels||0) + ' ch, ' + (data.live_progs||0) + ' prg)';
+            } else {
+                statusEl.innerHTML = data.last_error ? '<span class=\"text-danger small\">\u274c Error</span>' : '<span class=\"text-success small\">\u2705 Idle</span>';
+                barWrap.style.display = 'none';
+            }
+            if (btn) btn.disabled = data.is_syncing;
+        }
+        function startPolling(id) {
+            if (polling[id]) return;
+            polling[id] = setInterval(async () => {
+                try {
+                    const resp = await fetch('/admin/source/' + id + '/progress');
+                    const data = await resp.json();
+                    updateRow(id, data);
+                    if (!data.is_syncing && data.done) { clearInterval(polling[id]); delete polling[id]; }
+                } catch(e) {}
+            }, 1500);
+        }
+        sourceIds.forEach(id => {
+            const el = document.getElementById('status-' + id);
+            if (el && el.textContent.includes('Syncing')) startPolling(id);
+            const btn = document.getElementById('refresh-btn-' + id);
+            if (btn) btn.addEventListener('click', () => setTimeout(() => startPolling(id), 1000));
+        });
+    })();
+
+    // --- Bulk Management Logic ---
+    function updateBulkEditorVisibility() {
+        const checked = document.querySelectorAll('.editor-checkbox:checked').length;
+        const el = document.getElementById('bulkEditorActions');
+        if (el) {
+            if (checked > 0) el.style.setProperty('display', 'inline-block', 'important');
+            else el.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    document.getElementById('editorSelectAll')?.addEventListener('change', function() {
+        document.querySelectorAll('.editor-checkbox').forEach(cb => cb.checked = this.checked);
+        updateBulkEditorVisibility();
+    });
+
+    document.querySelectorAll('.editor-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateBulkEditorVisibility);
+    });
+
+    async function bulkAction(type, id, mode, singleId = null) {
+        const checked = singleId ? [singleId] : Array.from(document.querySelectorAll('.editor-checkbox:checked')).map(cb => cb.value);
+        if (checked.length === 0) return;
+
+        const formData = new URLSearchParams();
+        checked.forEach(cid => formData.append('channel_ids', cid));
+        formData.append('mode', mode);
+        
+        let url = (type === 'collection') ? `/admin/collection/${id}/sync_channels` : `/admin/channel/bulk_tag_category`;
+        if (type === 'category') formData.append('category_id', id);
+        
+        const resp = await fetch(url, { 
+            method: 'POST', 
+            body: formData, 
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' } 
+        });
+        if (resp.ok) window.location.reload();
+    }
+
+    async function manageItem(type, id, name) {
+        const section = document.getElementById('itemManagerSection');
+        const title = document.getElementById('managerTitle');
+        const list = document.getElementById('managerList');
+        
+        section.style.display = 'block';
+        title.innerText = `Managing ${type.charAt(0).toUpperCase() + type.slice(1)}: ${name}`;
+        list.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+        
+        try {
+            const resp = await fetch(`/admin/${type}/${id}/channel_ids`);
+            const channelIds = await resp.json();
+            
+            if (channelIds.length === 0) {
+                list.innerHTML = '<span class="text-muted italic">Empty list. Add channels via the Editor tab.</span>';
+                return;
+            }
+            
+            list.innerHTML = '';
+            channelIds.forEach(cid => {
+                const span = document.createElement('span');
+                span.className = 'badge bg-light text-dark border d-flex align-items-center gap-2 py-1 px-2';
+                span.innerHTML = `<code>${cid}</code> <button type="button" class="btn-close" style="font-size:0.5rem;" onclick="removeFromItem('${type}', ${id}, '${cid}')"></button>`;
+                list.appendChild(span);
+            });
+        } catch (e) {
+            list.innerHTML = '<span class="text-danger">Error loading data.</span>';
+        }
+    }
+
+    async function removeFromItem(type, id, cid) {
+        const formData = new URLSearchParams();
+        formData.append('channel_ids', cid);
+        formData.append('mode', 'remove');
+        let url = (type === 'collection') ? `/admin/collection/${id}/sync_channels` : `/admin/channel/bulk_tag_category`;
+        if (type === 'category') formData.append('category_id', id);
+        
+        await fetch(url, { 
+            method: 'POST', 
+            body: formData, 
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' } 
+        });
+        manageItem(type, id, ""); 
+    }
+
+    function hideSelectedChannels(source = 'grouping') {
+        let ids = (source === 'editor') ? 
+            Array.from(document.querySelectorAll('.editor-checkbox:checked')).map(cb => cb.value) :
+            Array.from(document.getElementById('multiChannelSelect').selectedOptions).map(o => o.value);
+        
+        if (ids.length === 0) return alert("Select channels first.");
+        if (confirm(`Hide ${ids.length} channels and purge their data?`)) {
+            const form = document.createElement('form');
+            form.method = 'POST'; form.action = '/admin/channel/hide';
+            ids.forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'channel_ids'; input.value = id;
+                form.appendChild(input);
+            });
+            // Persist current filters and tab context
+            const targetInput = document.createElement('input');
+            targetInput.type = 'hidden'; targetInput.name = 'target_tab'; targetInput.value = source;
+            form.appendChild(targetInput);
+
+            const searchParams = new URLSearchParams(window.location.search);
+            ['q', 'country_id', 'page', 'per_page'].forEach(key => {
+                if (searchParams.has(key)) {
+                    const input = Object.assign(document.createElement('input'), {type: 'hidden', name: key, value: searchParams.get(key)});
+                    form.appendChild(input);
+                }
+            });
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    async function openGroupModal() {
+        const select = document.getElementById('multiChannelSelect');
+        const opts = Array.from(select.selectedOptions);
+         if (opts.length === 0) return;
+         const isEditingGroup = opts.length === 1 && opts[0].dataset.isGroup === "true";
+         if (opts.length < 2 && !isEditingGroup) return alert("Select at least two channels.");
+
+        // Reset text inputs
+        document.getElementsByName('canonical_name')[0].value = '';
+        document.getElementsByName('tvg_id')[0].value = '';
+        document.getElementById('groupMetaLogo').value = '';
+        document.getElementById('modalJobId').value = '';
+
+        const channelData = opts.map(opt => ({
+            id: opt.value,
+            name: opt.dataset.name,
+            is_group: opt.dataset.isGroup === "true",
+            primary_id: opt.dataset.primaryId,
+            tvg_id: opt.dataset.tvgId,
+            logo_override: opt.dataset.logoOverride,
+            sources: opt.dataset.sources,
+            member_ids: opt.dataset.memberIds.split(','),
+            members: JSON.parse(opt.dataset.members || "[]"),
+            group_db_id: opt.dataset.groupDbId || null
+        }));
+
+        populateGroupModal(channelData);
+    }
+
+    function populateGroupModal(channels, jobId = null) {
+        const container = document.getElementById('modalHiddenInputs');
+        const dropdown = document.getElementById('primaryChannelDropdown');
+        const preview = document.getElementById('epgPreviewContainer');
+        
+        container.innerHTML = ''; dropdown.innerHTML = '';
+        preview.innerHTML = '<div class="text-center p-3">? Loading EPG previews...</div>';
+        if (jobId) document.getElementById('modalJobId').value = jobId;
+
+        const allMemberIds = new Set();
+        const previewNames = {};
+
+        channels.forEach(c => {
+            // Add individual IDs for hidden inputs
+            if (c.member_ids) c.member_ids.forEach(id => allMemberIds.add(id));
+            else allMemberIds.add(c.id);
+
+            if (c.is_group) {
+                document.getElementsByName('canonical_name')[0].value = c.name;
+                document.getElementsByName('tvg_id')[0].value = c.tvg_id;
+                document.getElementById('groupMetaLogo').value = c.logo_override;
+                
+                c.members.forEach(m => {
+                    const dropOpt = new Option(`${m.name} (${m.id}) (Sources: ${m.sources})`, m.id);
+                    if (m.id === c.primary_id) dropOpt.selected = true;
+                    dropdown.add(dropOpt);
+                    previewNames[m.id] = m.name;
+                });
+            } else {
+                const dropOpt = new Option(`${c.name} (${c.id}) (Sources: ${c.sources})`, c.id);
+                dropdown.add(dropOpt);
+                previewNames[c.id] = c.name;
+            }
+        });
+
+        allMemberIds.forEach(id => {
+            const input = Object.assign(document.createElement('input'), {type: 'hidden', name: 'channel_ids', value: id});
+            container.appendChild(input);
+        });
+
+        // Show/hide ungroup button based on whether this is an existing group
+        const ungroupBtn = document.getElementById('ungroupBtn');
+        const editingGroup = channels.length === 1 && channels[0].is_group && channels[0].group_db_id;
+        if (editingGroup) {
+            ungroupBtn.classList.remove('d-none');
+            ungroupBtn.dataset.groupId = channels[0].group_db_id;
+        } else {
+            ungroupBtn.classList.add('d-none');
+            delete ungroupBtn.dataset.groupId;
+        }
+
+        new bootstrap.Modal('#groupModal').show();
+        loadEpgPreviews(Array.from(allMemberIds), previewNames);
+    }
+
+    function confirmUngroup() {
+        const btn = document.getElementById('ungroupBtn');
+        const groupId = btn.dataset.groupId;
+        if (!groupId) return;
+        if (!confirm('Are you sure you want to ungroup? All channels will be returned to individual status.')) return;
+        const form = document.getElementById('ungroupForm');
+        form.action = '/admin/ungroup/' + groupId;
+        bootstrap.Modal.getInstance(document.getElementById('groupModal')).hide();
+        form.submit();
+    }
+
+    async function loadEpgPreviews(allMemberIds, previewNames) {
+        const preview = document.getElementById('epgPreviewContainer');
+        try {
+            const params = new URLSearchParams();
+            allMemberIds.forEach(id => params.append('ids', id));
+            const resp = await fetch('/admin/channel/epg_preview?' + params.toString());
+            const data = await resp.json();
+            
+            let html = '<div class="row g-2">';
+            allMemberIds.forEach(id => {
+                const progs = data[id] || [];
+                const name = previewNames[id] || id;
+                html += `<div class="col-md-6"><div class="card p-2 h-100"><div class="fw-bold border-bottom mb-1 pb-1 text-truncate">${name} <span class="fw-normal text-muted" style="font-size: 0.7rem;">(${id})</span></div>`;
+                if (progs.length === 0) {
+                    html += `<div class="text-muted italic">No data found</div>`;
+                } else {
+                    progs.forEach(p => {
+                        html += `<div class="d-flex justify-content-between"><span>${p.title}</span><span class="text-muted ms-2">${p.time}</span></div>`;
+                    });
+                }
+                html += `</div></div>`;
+            });
+            preview.innerHTML = html + '</div>';
+        } catch (e) {
+            preview.innerHTML = '<div class="text-danger">Error loading previews.</div>';
+        }
+    }
+
+    function queueSelectedChannels() {
+        const select = document.getElementById('multiChannelSelect');
+        const ids = Array.from(select.selectedOptions).map(o => o.value);
+        if (ids.length === 0) return alert("Select channels to queue.");
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/group_queue/add';
+        ids.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = 'channel_ids'; input.value = id;
+            form.appendChild(input);
+        });
+        // Persist current filters
+        const searchParams = new URLSearchParams(window.location.search);
+        ['q', 'country_id', 'page', 'per_page'].forEach(key => {
+            if (searchParams.has(key)) {
+                const input = Object.assign(document.createElement('input'), {type: 'hidden', name: key, value: searchParams.get(key)});
+                form.appendChild(input);
+            }
+        });
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    async function processQueuedJob(jobId) {
+        try {
+            const resp = await fetch(`/admin/group_queue/details/${jobId}`);
+            const channels = await resp.json();
+            populateGroupModal(channels, jobId);
+        } catch (e) {
+            alert("Error fetching job details.");
+        }
+    }
+
+    function openEditMetadataModal(id, name, tvgId, logo) {
+        document.getElementById('editMetaId').value = id;
+        document.getElementById('editMetaName').value = name;
+        document.getElementById('editMetaTvgId').value = tvgId;
+        document.getElementById('editMetaLogo').value = logo;
+        new bootstrap.Modal('#editMetadataModal').show();
+    }
+
+    function resetUserPassword(userId, username) {
+        const newPass = prompt("Enter new password for user: " + username);
+        if (newPass && newPass.trim() !== "") {
+            const form = document.getElementById('ua' + userId);
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'reset_password';
+            form.appendChild(actionInput);
+            document.getElementById('pw' + userId).value = newPass;
+            form.submit();
+        }
+    }
+
+    // --- GitHub Logo Selector Logic ---
+    const GITHUB_TOKEN = "{{ github_token }}";
+    const GITHUB_API_BASE = "https://api.github.com/repos/tv-logo/tv-logos/contents/";
+
+    async function fetchGithub(path) {
+        const headers = { 'Accept': 'application/vnd.github.v3+json' };
+        if (GITHUB_TOKEN && GITHUB_TOKEN.trim() !== "") {
+            headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+        }
+        const resp = await fetch(GITHUB_API_BASE + path, { headers });
+        if (!resp.ok) throw new Error("GitHub API Error: " + resp.statusText);
+        return await resp.json();
+    }
+
+    function openLogoSelector(targetInputId = 'editMetaLogo') {
+        bootstrap.Modal.getOrCreateInstance('#logoSelectorModal').show();
+        loadGithubFolders('countries', targetInputId);
+    }
+
+    async function loadGithubFolders(path, targetInputId) {
+        const grid = document.getElementById('logoGrid');
+        const loader = document.getElementById('logoLoading');
+        const breadcrumb = document.getElementById('logoBreadcrumb');
+
+        grid.innerHTML = '';
+        loader.style.display = 'block';
+
+        breadcrumb.innerHTML = `<li class="breadcrumb-item"><a href="#" onclick="loadGithubFolders('countries', '${targetInputId}')">Countries</a></li>`;
+        if (path !== 'countries' && path !== '') { // Handle root path correctly
+            const relative = path.replace('countries/', '');
+            breadcrumb.innerHTML += `<li class="breadcrumb-item active">${relative.split('/').pop()}</li>`;
+        }
+
+        try {
+            const data = await fetchGithub(path);
+            loader.style.display = 'none';
+
+            data.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                const col = document.createElement('div');
+                col.className = 'col';
+                if (item.type === 'dir') {
+                    col.innerHTML = `<div class="card h-100 text-center cursor-pointer shadow-sm border-primary" onclick="loadGithubFolders('${item.path}', '${targetInputId}')">
+                        <div class="card-body py-4"><span style="font-size: 2rem;">??</span><div class="small fw-bold mt-2 text-truncate">${item.name}</div></div>
+                    </div>`;
+                } else if (item.type === 'file' && /\.(png|jpg|svg)$/i.test(item.name)) {
+                    col.innerHTML = `<div class="card h-100 text-center cursor-pointer shadow-sm p-2" onclick="setLogoUrl('${item.download_url}', '${targetInputId}')">
+                        <img src="${item.download_url}" class="card-img-top mx-auto mt-2" style="width: 60px; height: 60px; object-fit: contain;">
+                        <div class="card-body p-1 mt-2 text-truncate" style="font-size: 0.65rem;">${item.name}</div>
+                    </div>`;
+                }
+                grid.appendChild(col);
+            });
+        } catch (e) {
+            loader.style.display = 'none';
+            grid.innerHTML = `<div class="col-12 text-center text-danger p-4">Error: ${e.message}</div>`;
+        }
+    }
+
+    function setLogoUrl(url, targetInputId) {
+        document.getElementById(targetInputId).value = url;
+        bootstrap.Modal.getInstance(document.getElementById('logoSelectorModal')).hide();
+    }
+    </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const select = document.getElementById('multiChannelSelect');
+    if (!select) return;
+
+    let queuedIds = [];
+    try { queuedIds = JSON.parse(select.dataset.queuedIds || '[]'); } catch(e) {}
+    const queuedSet = new Set(queuedIds.map(String));
+
+    Array.from(select.options).forEach(function(opt) {
+        const isGroup  = opt.dataset.isGroup === 'true';
+        const isQueued = queuedSet.has(String(opt.value));
+        const text     = opt.textContent;
+
+        if (isGroup) {
+            // Prefix with green circle marker
+            if (!text.startsWith('\u25cf ')) opt.textContent = '\u25cf ' + text;
+            opt.style.setProperty('color', '#166534', 'important');
+            opt.style.setProperty('font-weight', 'bold', 'important');
+        } else if (isQueued) {
+            // Prefix with blue bookmark marker
+            if (!text.startsWith('\u25c6 ')) opt.textContent = '\u25c6 ' + text;
+            opt.style.setProperty('color', '#1e3a8a', 'important');
+            opt.style.setProperty('font-style', 'italic', 'important');
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    // If the URL has a hash (like #editor), scroll back to the top immediately
+    if (window.location.hash) {
+        window.scrollTo(0, 0);
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+Flask
+Flask-SQLAlchemy
+requests
+lxml
+psycopg2-binary
+gunicorn
